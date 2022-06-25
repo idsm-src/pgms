@@ -271,4 +271,41 @@ Still not good
 \copy: parse error at "sandbox/gnps_query"```
 
 
+This is working ?
+```COPY \i sandbox/gnps_query.sql TO './gnps_query_results.csv'  WITH DELIMITER ',' CSV HEADER;```
+
+Nope extra arg are ignored 
+
+```
+
+test=> COPY \i sandbox/gnps_query.sql TO './gnps_query_results.csv'  WITH DELIMITER ',' CSV HEADER;
+\i: extra argument "TO" ignored
+\i: extra argument "./gnps_query_results.csv" ignored
+\i: extra argument "WITH" ignored
+\i: extra argument "DELIMITER" ignored
+\i: extra argument "," ignored
+\i: extra argument "CSV" ignored
+\i: extra argument "HEADER;" ignored
+
+```
+
+```COPY 'sandbox/gnps_query.sql' TO './gnps_query_results.csv'  WITH DELIMITER ',' CSV HEADER;```
+
+Apparently it's not that simple ....
+
+found this https://stackoverflow.com/a/42065966
+
+\copy ($(<sandbox/gnps_query.sql)) to './gnps_query_results.csv' CSV HEADER
+
+Not working ... 
+test=> \copy ($(<sandbox/gnps_query.sql)) to './gnps_query_results.csv' CSV HEADER
+ERROR:  syntax error at or near "$"
+LINE 1: COPY  ( $ ( <sandbox/gnps_query.sql ) ) TO STDOUT CSV HEADER
+
+Testing this 
+
+https://stackoverflow.com/questions/39046908/psql-read-sql-file-and-output-to-csv
+
+Working
+
 
