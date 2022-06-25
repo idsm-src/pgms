@@ -14,5 +14,5 @@ select found_molecular_formula, found_inchi, found_pepmass, found_smiles, found_
     select spectrum, smiles, name from query
   ) as q
 ) as t
-where cosine_greedy_score > 0.8
+where cosine_greedy_score > 0.9
 order by cosine_greedy_score desc;
