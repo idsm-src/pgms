@@ -249,8 +249,26 @@ then run your query
 
 File is here 
 
+Testing direct output as csv (the previous line returns a text )
+
+\copy sandbox/gnps_qery.sql to ./gnps_query_results.csv CSV HEADER
+
+ERROR:  syntax error at or near "/"
+LINE 1: COPY  sandbox/gnps_qery.sql TO STDOUT CSV HEADER
 
 
+So when saving the query as .sql it can be called likes this
+
+\i sandbox/gnps_query.sql
+
+So I try
+
+\copy \i sandbox/gnps_query.sql to ./gnps_query_results.csv CSV HEADER
+
+
+Still not good 
+test=> \copy \i sandbox/gnps_query.sql to ./gnps_query_results.csv CSV HEADER
+\copy: parse error at "sandbox/gnps_query"
 
 
 
