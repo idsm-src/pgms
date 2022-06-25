@@ -313,7 +313,7 @@ Working
 # Working on the parent mass filter (lost some lines here)
 Basically the previous substarction line was not placed at the correct place.Now working
 
-````
+```
 select found_molecular_formula, found_inchi, found_pepmass, found_smiles, searched_smiles,searched_name, searched_pepmass, mass_diff, cosine_greedy_score from
 (
   select
@@ -333,6 +333,30 @@ select found_molecular_formula, found_inchi, found_pepmass, found_smiles, search
 ) as t
 where cosine_greedy_score > 0.2 and mass_diff between -0.2 and 0.2
 order by cosine_greedy_score desc;
-````
+```
+
+Lets work with the modified cosine 
+
+```
+select found_molecular_formula, found_inchi, found_pepmass, found_smiles, searched_smiles,searched_name, searched_pepmass, mass_diff, modified_cosine_score from
+(
+  select
+    s.molecular_formula as found_molecular_formula,
+    s.inchi as found_inchi,
+    s.pepmass as found_pepmass,
+    s.smiles as found_smiles,
+    q.smiles as searched_smiles,
+    q.pepmass as searched_pepmass,
+    q.name as searched_name,
+    s.pepmass - q.pepmass as mass_diff,
+    pgms.modified_cosine(s.spectrum, q.spectrum) as modified_cosine_score
+      from spectrums as s,
+  (
+    select spectrum, smiles, pepmass, name from query
+  ) as q
+) as t
+where modified_cosine_score > 0.2 and mass_diff between -0.2 and 0.2
+order by modified_cosine_score desc;
+```
 
 
