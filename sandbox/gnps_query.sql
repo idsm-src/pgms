@@ -1,4 +1,4 @@
-select found_molecular_formula, found_inchi, found_pepmass, found_smiles, found_name, searched_smiles, searched_name, cosine_greedy_score from
+select found_molecular_formula, found_inchi, found_pepmass, found_smiles, found_name, searched_smiles, searched_name, searched_molecular_formula, cosine_greedy_score from
 (
   select 
     s.molecular_formula as found_molecular_formula, 
@@ -8,10 +8,11 @@ select found_molecular_formula, found_inchi, found_pepmass, found_smiles, found_
     s.name as found_name,
     q.smiles as searched_smiles, 
     q.name as searched_name,
+    q.molecular_formula as searched_molecular_formula,
     pgms.cosine_greedy(s.spectrum, q.spectrum) as cosine_greedy_score 
       from spectrums as s,
   (
-    select spectrum, smiles, name from query
+    select spectrum, smiles, name, molecular_formula from query
   ) as q
 ) as t
 where cosine_greedy_score > 0.8
