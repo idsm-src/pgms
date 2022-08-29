@@ -37,7 +37,8 @@ pseudocode described in pages 1685-1686 of:
     52(4):1679-1696, August 2016
     doi: 10.1109/TAES.2016.140952
 
-Author: PM Larsen & Jakub Galgonek
+Author: PM Larsen
+        Jakub Galgonek
 */
 
 #include <postgres.h>
