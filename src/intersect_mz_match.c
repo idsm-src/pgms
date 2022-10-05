@@ -37,21 +37,24 @@ Datum intersect_mz(PG_FUNCTION_ARGS)
 
     const float tolerance = PG_GETARG_FLOAT4(2);
 
+
     size_t count_intersect = 0;
     size_t count_union = 0;
 
-    Index peak1 = 0, peak2 = 0;
-    while (peak1 < len1 && peak2 < len2)
+    Index peak1 = 0;
+    Index peak2 = 0;
+
+    while(peak1 < len1 && peak2 < len2)
     {
         float low_bound = mz1[peak1] - tolerance;
         float high_bound = mz1[peak1] + tolerance;
 
-        if (low_bound < mz2[peak2])
+        if(low_bound < mz2[peak2])
         {
             peak1++;
             count_union++;
         }
-        else if (high_bound > mz2[peak2])
+        else if(high_bound > mz2[peak2])
         {
             peak2++;
             count_union++;
@@ -65,14 +68,14 @@ Datum intersect_mz(PG_FUNCTION_ARGS)
         }
     }
 
-    while (peak1 < len1)
+    while(peak1 < len1)
         count_union++;
 
-    while (peak2 < len2)
+    while(peak2 < len2)
         count_union++;
 
     PG_FREE_IF_COPY(spec1, 0);
     PG_FREE_IF_COPY(spec2, 1);
 
-    PG_RETURN_FLOAT4(count_intersect == 0 ? 0.0f : (float)count_intersect/(float)count_union);
+    PG_RETURN_FLOAT4(count_intersect == 0 ? 0 : count_intersect / (float)count_union);
 }

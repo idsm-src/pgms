@@ -39,14 +39,15 @@ void _PG_init()
     spectrumOid = GetSysCacheOid2(TYPENAMENSP, Anum_pg_type_oid, PointerGetDatum("spectrum"), ObjectIdGetDatum(spaceid));
 }
 
-char* reverse_postfix_sign(char* value)
+
+char *reverse_postfix_sign(char *value)
 {
     size_t length = 0;
     char *psign = NULL;
-    char* pbegin = value;
-    
+    char *pbegin = value;
+
     if(!value || *value == '\0')
-        goto end;
+        return value;
 
     length = strlen(value);
     psign = value + length - 1;
@@ -58,9 +59,13 @@ char* reverse_postfix_sign(char* value)
         psign--;
 
     if(unlikely(psign == pbegin))
-        goto end;
+    {
+        return value;
+    }
     else if(*psign == POSITIVE_SIGN)
+    {
         *psign = '\0';
+    }
     else if(*psign == NEGATIVE_SIGN)
     {
         while(psign != pbegin)
@@ -70,11 +75,8 @@ char* reverse_postfix_sign(char* value)
             *(--psign) = NEGATIVE_SIGN;
         }
     }
-
-end:
-    elog(DEBUG1, "rotated: %s", value);
-    return value;
 }
+
 
 PG_FUNCTION_INFO_V1(precursor_mz_correction_float);
 Datum precursor_mz_correction_float(PG_FUNCTION_ARGS)
@@ -82,25 +84,23 @@ Datum precursor_mz_correction_float(PG_FUNCTION_ARGS)
     PG_RETURN_DATUM(PG_GETARG_DATUM(0));
 }
 
+
 PG_FUNCTION_INFO_V1(precursor_mz_correction_array);
 Datum precursor_mz_correction_array(PG_FUNCTION_ARGS)
 {
     ArrayType *array = PG_GETARG_ARRAYTYPE_P(0);
 
-    PG_RETURN_DATUM(
-        ARR_SIZE(array) > 0 
-        ? Float4GetDatum(*(float4*)ARR_DATA_PTR(array))
-        : 0
-    );
+    PG_RETURN_DATUM(ARR_SIZE(array) > 0 ? Float4GetDatum(*(float4*)ARR_DATA_PTR(array)) : 0);
 }
 
-void set_spectrum(AttInMetadata *attinmeta, Datum *values, bool *isnull, spectrum_t* data, int count)
+
+void set_spectrum(AttInMetadata *attinmeta, Datum *values, bool *isnull, spectrum_t *data, int count)
 {
     TupleDesc tupdesc = attinmeta->tupdesc;
     size_t size = count * sizeof(spectrum_t) + VARHDRSZ;
-    void *result = palloc0(size);
-    float4* result_data = (float4*) VARDATA(result);
 
+    void *result = palloc0(size);
+    float4 *result_data = (float4*) VARDATA(result);
     SET_VARSIZE(result, size);
 
     for(size_t i = 0; i < count; i++)
@@ -119,9 +119,10 @@ void set_spectrum(AttInMetadata *attinmeta, Datum *values, bool *isnull, spectru
     }
 }
 
-int spectrum_cmp(const void* l,const void* r)
+
+int spectrum_cmp(const void *l,const void *r)
 {
-    spectrum_t* l_value = (spectrum_t*)l;
-    spectrum_t* r_value = (spectrum_t*)r;
+    spectrum_t *l_value = (spectrum_t*)l;
+    spectrum_t *r_value = (spectrum_t*)r;
     return l_value->mz > r_value->mz;
 }

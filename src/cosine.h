@@ -26,7 +26,7 @@
 #include <math.h>
 
 
-static inline float calc_score(const float intensity1, const float intensity2, const float mz1,  const float mz2, const float intensity_power, const float mz_power)
+static inline float calc_score(const float intensity1, const float intensity2, const float mz1, const float mz2, const float intensity_power, const float mz_power)
 {
     if(mz_power == 0 && intensity_power == 1)
         return intensity1 * intensity2;

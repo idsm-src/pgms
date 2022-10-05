@@ -17,15 +17,17 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pgms.h"
-
+#include <postgres.h>
 #include <utils/builtins.h>
 #include <catalog/pg_type.h>
 #if PG_VERSION_NUM >= 130000
-    #include <utils/jsonb.h>
+#include <utils/jsonb.h>
 #else
-    #include <utils/jsonapi.h>
+#include <utils/jsonapi.h>
 #endif
+
+#include "pgms.h"
+
 #define CVECTOR_CUSTOM_MALLOC
 #define cvector_clib_free       pfree
 #define cvector_clib_malloc     palloc
@@ -34,29 +36,36 @@
 
 #include "cvector.h"
 
+
 typedef struct
 {
-    JsonbIterator   *it;
-    Datum*          values;
-    bool*           isnull;
+    JsonbIterator *it;
     JsonbIteratorToken state;
-    size_t          cnt;
-} json_ctx_t;
+    Datum *values;
+    bool *isnull;
+    size_t cnt;
+}
+json_ctx_t;
 
-static void json_ctx_free(json_ctx_t* ctx)
+
+static void json_ctx_free(json_ctx_t *ctx)
 {
-    if(!ctx)
+    if(ctx == NULL)
         return;
+
     if(ctx->values)
         pfree(ctx->values);
+
     if(ctx->isnull)
         pfree(ctx->isnull);
+
     pfree(ctx);
 }
 
-static json_ctx_t* json_ctx_create(Jsonb* jb, TupleDesc td)
+
+static json_ctx_t *json_ctx_create(Jsonb *jb, TupleDesc td)
 {
-    json_ctx_t* json_ctx = (json_ctx_t*) palloc0(sizeof(json_ctx_t));
+    json_ctx_t *json_ctx = (json_ctx_t *) palloc0(sizeof(json_ctx_t));
 
     json_ctx->it = JsonbIteratorInit(&jb->root);
     json_ctx->values = palloc(td->natts * sizeof(Datum));
@@ -72,6 +81,7 @@ static json_ctx_t* json_ctx_create(Jsonb* jb, TupleDesc td)
     return json_ctx;
 }
 
+
 void json_ctx_next(AttInMetadata *attinmeta, json_ctx_t *json_ctx)
 {
     StringInfo data = makeStringInfo();
@@ -86,24 +96,23 @@ void json_ctx_next(AttInMetadata *attinmeta, json_ctx_t *json_ctx)
     {
         JsonbValue val = { 0 };
         JsonbIteratorToken state = JsonbIteratorNext(&json_ctx->it, &val, false);
-        switch (state)
+
+        switch(state)
         {
             case WJB_KEY:
                 idx = 0;
                 appendBinaryStringInfo(data, val.val.string.val, val.val.string.len);
-                while(idx < tupdesc->natts
-                    && !TupleDescAttr(tupdesc, idx)->attisdropped
-                    && strcmp(data->data, NameStr(TupleDescAttr(tupdesc, idx)->attname))
-                    )
+
+                while(idx < tupdesc->natts && !TupleDescAttr(tupdesc, idx)->attisdropped
+                        && strcmp(data->data, NameStr(TupleDescAttr(tupdesc, idx)->attname)))
                     idx++;
                 break;
+
             case WJB_ELEM:
                 if(tupdesc->attrs[idx].atttypid == spectrumOid)
                 {
                     char *tmp = DatumGetCString(DirectFunctionCall1(numeric_out, NumericGetDatum(val.val.numeric)));
                     Datum result = DirectFunctionCall1(float4in, CStringGetDatum(tmp));
-
-                    elog(DEBUG1, "WJB_ELEM %s", tmp);
 
                     if(elem_cnt++ % 2 == 0)
                     {
@@ -120,6 +129,7 @@ void json_ctx_next(AttInMetadata *attinmeta, json_ctx_t *json_ctx)
                     pfree(tmp);
                 }
                 break;
+
             case WJB_VALUE:
                 if(idx != tupdesc->natts)
                 {
@@ -130,50 +140,55 @@ void json_ctx_next(AttInMetadata *attinmeta, json_ctx_t *json_ctx)
 
                     json_ctx->values[idx] = InputFunctionCall(&attinmeta->attinfuncs[idx], data->data, attinmeta->attioparams[idx], attinmeta->atttypmods[idx]);
                     json_ctx->isnull[idx] = false;
-                    elog(DEBUG1, "WJB_VALUE %s", data->data);
                 }
+
                 idx = tupdesc->natts;
                 break;
+
             case WJB_BEGIN_ARRAY:
-                if( idx != tupdesc->natts 
-                    && tupdesc->attrs[idx].atttypid == spectrumOid
-                    && ions_cnt == 0)
+                if(idx != tupdesc->natts && tupdesc->attrs[idx].atttypid == spectrumOid && ions_cnt == 0)
                 {
                     ions_cnt = json_ctx->it->nElems;
-                    elog(DEBUG1, "WJB_BEGIN_ARRAY of %d", json_ctx->it->nElems);
                     cvector_reserve(spectrum, ions_cnt);
                 }
+
                 if(idx == tupdesc->natts)
                     json_ctx->state = WJB_BEGIN_OBJECT;
+
                 break;
+
             case WJB_END_ARRAY:
-                if( idx != tupdesc->natts
-                    && tupdesc->attrs[idx].atttypid == spectrumOid
-                    && ions_cnt == 0)
+                if(idx != tupdesc->natts && tupdesc->attrs[idx].atttypid == spectrumOid && ions_cnt == 0)
                 {
-                    elog(DEBUG1, "WJB_END_ARRAY");
                     qsort(spectrum, cvector_size(spectrum), sizeof(spectrum_t), spectrum_cmp);
                     set_spectrum(attinmeta, json_ctx->values, json_ctx->isnull, spectrum, cvector_size(spectrum));
                     cvector_free(spectrum);
                     idx = tupdesc->natts;
                 }
+
                 break;
+
             case WJB_BEGIN_OBJECT:
                 json_ctx->state = json_ctx->state == WJB_DONE ? WJB_BEGIN_OBJECT : WJB_END_OBJECT;
                 break;
+
             case WJB_END_OBJECT:
-                json_ctx->state = json_ctx->state == WJB_END_OBJECT ? WJB_BEGIN_OBJECT : WJB_DONE; 
+                json_ctx->state = json_ctx->state == WJB_END_OBJECT ? WJB_BEGIN_OBJECT : WJB_DONE;
                 break;
+
             case WJB_DONE:
             default:
                 break;
         }
+
         resetStringInfo(data);
-    } while (json_ctx->state != WJB_DONE);
+    }
+    while(json_ctx->state != WJB_DONE);
 
     pfree(data->data);
     pfree(data);
 }
+
 
 PG_FUNCTION_INFO_V1(load_from_json);
 Datum load_from_json(PG_FUNCTION_ARGS)
@@ -190,8 +205,7 @@ Datum load_from_json(PG_FUNCTION_ARGS)
         oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
         if(get_call_result_type(fcinfo, NULL, &tuple_desc) != TYPEFUNC_COMPOSITE)
-            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED)
-                , errmsg("unsupported return type")));
+            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("unsupported return type")));
 
         funcctx->attinmeta = TupleDescGetAttInMetadata(tuple_desc);
         funcctx->user_fctx = (void*) json_ctx_create(PG_GETARG_JSONB_P(0), tuple_desc);
@@ -199,7 +213,7 @@ Datum load_from_json(PG_FUNCTION_ARGS)
     }
 
     funcctx = SRF_PERCALL_SETUP();
-    json_ctx = (json_ctx_t*) funcctx->user_fctx;
+    json_ctx = (json_ctx_t *) funcctx->user_fctx;
     tuple_desc = funcctx->attinmeta->tupdesc;
 
     PG_TRY();

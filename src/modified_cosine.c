@@ -29,8 +29,8 @@
 PG_FUNCTION_INFO_V1(modified_cosine);
 Datum modified_cosine(PG_FUNCTION_ARGS)
 {
-    bytea* reference = PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
-    bytea* query = PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
+    bytea *reference = PG_DETOAST_DATUM(PG_GETARG_DATUM(0));
+    bytea *query = PG_DETOAST_DATUM(PG_GETARG_DATUM(1));
 
     size_t reference_len = (VARSIZE(reference) - VARHDRSZ) / sizeof(float4) / 2;
     float4 *restrict reference_mzs = (float4 *) VARDATA(reference);
@@ -65,7 +65,9 @@ Datum modified_cosine(PG_FUNCTION_ARGS)
                 continue;
 
             matches++;
-            score += calc_score(reference_peaks[reference_index], query_peaks[query_index], reference_mzs[reference_index], query_mzs[query_index], intensity_power, mz_power);
+            score += calc_score(reference_peaks[reference_index], query_peaks[query_index],
+                    reference_mzs[reference_index], query_mzs[query_index], intensity_power, mz_power);
+
             break;
         }
     }

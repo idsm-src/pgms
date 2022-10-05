@@ -43,7 +43,7 @@
 #define BUFFER_SIZE             (1 << 20) //1MB
 #define INITIAL_SPECTRUM_SIZE   200
 
-typedef enum 
+typedef enum
 {
     BEGIN       = 0,
     BEGIN_IONS  = 1,
@@ -54,18 +54,19 @@ ParserState;
 
 typedef struct
 {
-    LargeObjectDesc*    file;
-    int                 pos;
-    int                 size;
-    char*               data;
-    Datum*              g_values;
-    bool*               g_isnull;
-    AttInMetadata *     meta;
-    ParserState         status;
+    LargeObjectDesc *file;
+    int pos;
+    int size;
+    char *data;
+    Datum *g_values;
+    bool *g_isnull;
+    AttInMetadata *meta;
+    ParserState status;
 }
 ParserData, *Parser;
 
-static bool is_blank(const char* s)
+
+static bool is_blank(const char *s)
 {
     Assert(s);
 
@@ -81,19 +82,18 @@ static bool is_blank(const char* s)
     }
 }
 
+
 static bool is_comment(StringInfo str)
 {
     size_t comments_lenght = sizeof(COMMENT_STR) - 1;
 
     for(size_t i = 0; i < comments_lenght; ++i)
         if(str->data[0] == COMMENT_STR[i])
-        {
-            elog(DEBUG1, "Comment: %s", str->data + 1);
             return true;
-        }
 
     return false;
 }
+
 
 static void set_parameter(AttInMetadata *attinmeta, Datum *values, bool *isnull, char *name, char *value)
 {
@@ -101,18 +101,14 @@ static void set_parameter(AttInMetadata *attinmeta, Datum *values, bool *isnull,
 
     int idx = 0;
 
-    while(idx < tupdesc->natts
-        && !TupleDescAttr(tupdesc, idx)->attisdropped
-        && strcmp(name, NameStr(TupleDescAttr(tupdesc, idx)->attname))
-        )
+    while(idx < tupdesc->natts && !TupleDescAttr(tupdesc, idx)->attisdropped
+            && strcmp(name, NameStr(TupleDescAttr(tupdesc, idx)->attname)))
         idx++;
 
     if(idx == tupdesc->natts || tupdesc->attrs[idx].atttypid == spectrumOid)
         return;
 
     Oid typid = TupleDescAttr(tupdesc, idx)->atttypid;
-
-    elog(DEBUG1, "param %s with typeiod: %d", name, typid);
 
     if(typid == INT4RANGEOID || typid == INT8RANGEOID || typid == NUMRANGEOID)
     { // special treatment of mgf ranges
@@ -178,7 +174,7 @@ static void set_parameter(AttInMetadata *attinmeta, Datum *values, bool *isnull,
         cvector_reserve(tkns, 50);
         cvector_push_back(tkns, pbegin);
 
-        for (value = pbegin; value != pend; value++)
+        for(value = pbegin; value != pend; value++)
         {
             if(unlikely(isspace(*value)))
             {
@@ -196,14 +192,17 @@ static void set_parameter(AttInMetadata *attinmeta, Datum *values, bool *isnull,
 
         count = cvector_size(tkns);
         appendStringInfoCharMacro(array, '{');
+
         for(size_t i = 0; i < count; i++)
         {
             reverse_postfix_sign(tkns[i]);
             appendStringInfoString(array, tkns[i]);
             appendStringInfoCharMacro(array, i == count - 1 ? '}' : ',');
         }
+
         values[idx] = InputFunctionCall(&attinmeta->attinfuncs[idx], array->data, attinmeta->attioparams[idx], attinmeta->atttypmods[idx]);
         isnull[idx] = false;
+
         pfree(array->data);
         pfree(array);
         return;
@@ -213,7 +212,8 @@ static void set_parameter(AttInMetadata *attinmeta, Datum *values, bool *isnull,
     isnull[idx] = false;
 }
 
-static Parser parser_init_lob(LargeObjectDesc* in)
+
+static Parser parser_init_lob(LargeObjectDesc *in)
 {
     Parser parser = palloc(sizeof(ParserData));
 
@@ -229,7 +229,8 @@ static Parser parser_init_lob(LargeObjectDesc* in)
     return parser;
 }
 
-static Parser parser_init_varchar(VarChar* in)
+
+static Parser parser_init_varchar(VarChar *in)
 {
     Parser parser = palloc(sizeof(ParserData));
 
@@ -246,6 +247,7 @@ static Parser parser_init_varchar(VarChar* in)
     return parser;
 }
 
+
 static void parser_close(Parser parser)
 {
     pfree(parser->data);
@@ -260,6 +262,7 @@ static void parser_close(Parser parser)
     pfree(parser->g_isnull);
     pfree(parser);
 }
+
 
 static int read_line(Parser parser, StringInfo buffer)
 {
@@ -280,7 +283,7 @@ static int read_line(Parser parser, StringInfo buffer)
         {
             if(white_only)
                 return EOF;
-            else 
+            else
                 break;
         }
 
@@ -288,9 +291,8 @@ static int read_line(Parser parser, StringInfo buffer)
 
         if(isgraph(c))
             white_only = false;
-        else if (c == '\0')
-            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED)
-                , errmsg("Unsupported character: '\\0'")));
+        else if(c == '\0')
+            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("Unsupported character: '\\0'")));
 
         if(c == '\n')
             break;
@@ -301,7 +303,6 @@ static int read_line(Parser parser, StringInfo buffer)
     }
     while(true);
 
-    elog(DEBUG1, "read line: %s", buffer->data);
     return white_only ? 0 : cnt;
 }
 
@@ -327,7 +328,7 @@ static void parser_global_setup(Parser parser, AttInMetadata *meta)
     {
         int result = read_line(parser, line);
         bool bcomment = false;
-        char* eq = NULL;
+        char *eq = NULL;
 
         if(result == EOF)
             break;
@@ -336,7 +337,7 @@ static void parser_global_setup(Parser parser, AttInMetadata *meta)
 
         bcomment = is_comment(line);
 
-        if(!bcomment && parser->status == BEGIN && !strcmp (BEGIN_IONS_STR,line->data))
+        if(!bcomment && parser->status == BEGIN && !strcmp(BEGIN_IONS_STR,line->data))
         {
             parser->status = BEGIN_IONS;
             break;
@@ -345,7 +346,6 @@ static void parser_global_setup(Parser parser, AttInMetadata *meta)
         {
             *eq++ = '\0';
             set_parameter(parser->meta, parser->g_values, parser->g_isnull, line->data, eq);
-            elog(DEBUG1, "%s: %s", line->data, eq);
         }
         resetStringInfo(line);
     }
@@ -354,19 +354,19 @@ static void parser_global_setup(Parser parser, AttInMetadata *meta)
     pfree(line);
 }
 
-static bool parser_next(Parser parser, Datum* l_values, bool* l_isnull)
+
+static bool parser_next(Parser parser, Datum *l_values, bool *l_isnull)
 {
     cvector_vector_type(spectrum_t) spectrum = NULL;
     StringInfo line = makeStringInfo();
 
-    elog(DEBUG1, "parser_next");
     do
     {
         int result = 0;
         float f1, f2;
-        char* pEnd1 = NULL;
-        char* pEnd2 = NULL;
-        char* eq = NULL;
+        char *pEnd1 = NULL;
+        char *pEnd2 = NULL;
+        char *eq = NULL;
 
         result = read_line(parser, line);
 
@@ -383,18 +383,15 @@ static bool parser_next(Parser parser, Datum* l_values, bool* l_isnull)
 
         if(is_comment(line))
         {
-            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED)
-                , errmsg("Missplaced comment")));
+            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("Missplaced comment")));
         }
-        else if(parser->status == BEGIN && !strcmp (BEGIN_IONS_STR,line->data))
+        else if(parser->status == BEGIN && !strcmp(BEGIN_IONS_STR,line->data))
         {
-            elog(DEBUG1, BEGIN_IONS_STR);
             parser->status = BEGIN_IONS;
             cvector_reserve(spectrum, INITIAL_SPECTRUM_SIZE);
         }
-        else if(parser->status == BEGIN_IONS && !strcmp (END_IONS_STR,line->data))
+        else if(parser->status == BEGIN_IONS && !strcmp(END_IONS_STR,line->data))
         {
-            elog(DEBUG1, END_IONS_STR);
             qsort(spectrum, cvector_size(spectrum), sizeof(spectrum_t), spectrum_cmp);
             set_spectrum(parser->meta, l_values, l_isnull, spectrum, cvector_size(spectrum));
             cvector_free(spectrum);
@@ -404,24 +401,21 @@ static bool parser_next(Parser parser, Datum* l_values, bool* l_isnull)
         {
             *eq++ = '\0';
             set_parameter(parser->meta, l_values, l_isnull, line->data, eq);
-            elog(DEBUG1, "%s: %s", line->data, eq);
         }
-        else if(parser->status == BEGIN_IONS
-            && ((f1 = strtof (line->data, &pEnd1)) || pEnd1 != line->data)
-            && ((f2 = strtof (pEnd1, &pEnd2))      || pEnd2 != pEnd1) 
-            )
+        else if(parser->status == BEGIN_IONS && ((f1 = strtof(line->data, &pEnd1)) || pEnd1 != line->data)
+                && ((f2 = strtof(pEnd1, &pEnd2))      || pEnd2 != pEnd1))
         {
             if(!is_blank(pEnd2))
                 ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED)
                     , errmsg("Unknown format line: %s", line->data)));
 
             *pEnd1++ = '\0';
-            elog(DEBUG1, "[%s %s]", line->data, pEnd1);
             cvector_push_back(spectrum, ((spectrum_t){ f1, f2 }));
         }
         else
-            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED)
-                , errmsg("Unknown format line: %s", line->data)));
+        {
+            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("Unknown format line: %s", line->data)));
+        }
 
         resetStringInfo(line);
     }
@@ -432,14 +426,15 @@ static bool parser_next(Parser parser, Datum* l_values, bool* l_isnull)
     return parser->status != END;
 }
 
+
 PG_FUNCTION_INFO_V1(load_from_mgf);
 Datum load_from_mgf(PG_FUNCTION_ARGS)
 {
     bool next;
     FuncCallContext *funcctx = NULL;
     Parser parser = NULL;
-    Datum* values = NULL;
-    bool* isnull = NULL;
+    Datum *values = NULL;
+    bool *isnull = NULL;
 
     if(SRF_IS_FIRSTCALL())
     {
@@ -452,8 +447,7 @@ Datum load_from_mgf(PG_FUNCTION_ARGS)
         oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
         if(get_call_result_type(fcinfo, NULL, &tuple_desc) != TYPEFUNC_COMPOSITE)
-            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED)
-                , errmsg("unsupported return type")));
+            ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("unsupported return type")));
 
         funcctx->attinmeta = TupleDescGetAttInMetadata(tuple_desc);
         element_type = get_fn_expr_argtype(fcinfo->flinfo, 0);
@@ -461,9 +455,7 @@ Datum load_from_mgf(PG_FUNCTION_ARGS)
         if(element_type == VARCHAROID)
             parser = parser_init_varchar(PG_GETARG_VARCHAR_P(0));
         else if(element_type == OIDOID)
-            parser = parser_init_lob(
-                inv_open(PG_GETARG_OID(0), INV_READ, funcctx->multi_call_memory_ctx)
-            );
+            parser = parser_init_lob(inv_open(PG_GETARG_OID(0), INV_READ, funcctx->multi_call_memory_ctx));
 
         parser_global_setup(parser, funcctx->attinmeta);
         funcctx->user_fctx = (void*)parser;
@@ -483,7 +475,6 @@ Datum load_from_mgf(PG_FUNCTION_ARGS)
 
     PG_TRY();
     {
-
         next = parser_next(parser, values, isnull);
     }
     PG_CATCH();

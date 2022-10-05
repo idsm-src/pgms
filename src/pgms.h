@@ -27,16 +27,19 @@
 #define NEGATIVE_SIGN           '-'
 #define POSITIVE_SIGN           '+'
 
+
 typedef struct
 {
-   float4 mz;
-   float4 intenzity;
-} spectrum_t;
+    float4 mz;
+    float4 intenzity;
+}
+spectrum_t;
+
 
 extern Oid spectrumOid;
 
-char* reverse_postfix_sign(char*);
-void set_spectrum(AttInMetadata*, Datum*, bool*, spectrum_t*, int);
-int spectrum_cmp(const void*, const void*);
+char *reverse_postfix_sign(char *);
+void set_spectrum(AttInMetadata *, Datum *, bool *, spectrum_t *, int);
+int spectrum_cmp(const void *, const void *);
 
 #endif /* PGMS_H_ */

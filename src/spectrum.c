@@ -35,7 +35,7 @@ Datum spectrum_input(PG_FUNCTION_ARGS)
         if(*buffer == ':')
             count++;
 
-    size_t size = count * 2* sizeof(float4) + VARHDRSZ;
+    size_t size = count * 2 * sizeof(float4) + VARHDRSZ;
     void *result = palloc0(size);
     SET_VARSIZE(result, size);
 
@@ -86,6 +86,7 @@ Datum spectrum_output(PG_FUNCTION_ARGS)
     PG_RETURN_CSTRING(result);
 }
 
+
 PG_FUNCTION_INFO_V1(spectrum_max_intensity);
 Datum spectrum_max_intensity(PG_FUNCTION_ARGS)
 {
@@ -97,13 +98,12 @@ Datum spectrum_max_intensity(PG_FUNCTION_ARGS)
     float4 max = 0.0f;
 
     for(size_t i = count; i < size; i++)
-    {
         if(max < values[i])
             max = values[i];
-    }
 
     PG_RETURN_FLOAT4(max);
 }
+
 
 PG_FUNCTION_INFO_V1(spectrum_normalize);
 Datum spectrum_normalize(PG_FUNCTION_ARGS)
@@ -112,13 +112,11 @@ Datum spectrum_normalize(PG_FUNCTION_ARGS)
     size_t size = (VARSIZE(spectrum) - VARHDRSZ) / sizeof(float4);
     size_t count = size / 2;
     float4 *values = (float4 *) VARDATA(spectrum);
-    Datum result = (Datum) palloc0(VARSIZE(spectrum));
-    float4* result_values = (float4 *) VARDATA(result);
-    float4 max = DatumGetFloat4(
-        DirectFunctionCall1(spectrum_max_intensity
-            , PG_GETARG_DATUM(0))
-    );
 
+    float4 max = DatumGetFloat4(DirectFunctionCall1(spectrum_max_intensity, PG_GETARG_DATUM(0)));
+
+    Datum result = (Datum) palloc0(VARSIZE(spectrum));
+    float4 *result_values = (float4 *) VARDATA(result);
     SET_VARSIZE(result, VARSIZE(spectrum));
 
     for(size_t i = 0; i < count; i++)
