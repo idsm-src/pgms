@@ -25,8 +25,10 @@
 #include <math.h>
 #include <float.h>
 #include "cosine.h"
-#include "utils.h"
 #include "lsap.h"
+
+
+#define swap(a,b)   do { typeof(a) t = a; a = b; b = t; } while(0)
 
 
 PG_FUNCTION_INFO_V1(cosine_hungarian);

@@ -13,7 +13,6 @@ libpgms_la_SOURCES = \
 		pgms.c \
 		pgms.h \
 		spectrum.c \
-		utils.h \
 		intersect_mz_match.c \
 		precurzor_mz_match.c \
 		modified_cosine.c
