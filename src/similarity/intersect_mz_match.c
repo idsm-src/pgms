@@ -19,6 +19,9 @@
  */
 
 #include <postgres.h>
+#if PG_VERSION_NUM >= 160000
+#include <varatt.h>
+#endif
 #include <fmgr.h>
 #include <float.h>
 #include <math.h>

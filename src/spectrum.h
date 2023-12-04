@@ -2,7 +2,8 @@
  * This file is part of the PGMS PostgreSQL extension distribution
  * available at https://bioinfo.uochb.cas.cz/gitlab/chemdb/pgms.
  *
- * Copyright (c) 2021-2022 Jakub Galgonek
+ * Copyright (c) 2022 Marek Mosna
+ * Copyright (c) 2022 Jakub Galgonek
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,12 +18,20 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PGMS_H_
-#define PGMS_H_
+#ifndef SRC_SPECTRUM_H_
+#define SRC_SPECTRUM_H_
 
 #include <postgres.h>
 
 
-extern Oid spectrumOid;
+typedef struct
+{
+    float4 mz;
+    float4 intenzity;
+}
+SpectrumPeak;
 
-#endif /* PGMS_H_ */
+
+Datum create_spectrum(SpectrumPeak *data, int count);
+
+#endif /* SRC_SPECTRUM_H_ */

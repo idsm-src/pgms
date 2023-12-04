@@ -1,49 +1,51 @@
 # Postgres Mass Spectrometry Extension
 
-The extension was developed and tested on Linux Ubuntu 20.04.3 against Postgresql 12.9
+The extension was developed and tested against PostgreSQL 13 to 15.
 
-## Requirements
+## Install Dependencies
 
-On Debian based Linux distributions install following packages
-```bash
-sudo apt-get install git postgresql build-essential autoconf libtool
-```
-For Debian 11
+On Debian-based Linux distributions install the following basic packages:
 
 ```bash
-sudo apt install postgresql-server-dev-13
+sudo apt install git build-essential autoconf libtool
 ```
 
-For Ubuntu 20.04
+On Ubuntu 22.04 LTS, install PostgreSQL 14.x:
 
 ```bash
-sudo apt install postgresql-server-dev-12
+sudo apt install postgresql-14 postgresql-server-dev-14
 ```
 
-## Build
+On Debian 11, install PostgreSQL 13.x:
+
+```bash
+sudo apt install postgresql-13 postgresql-server-dev-13
+```
+
+
+## Build and Install
 
 ```bash
 git clone https://bioinfo.uochb.cas.cz/gitlab/chemdb/pgms.git
-cd pgms
 
+cd pgms
 autoreconf -i
+
 ./configure
 make
-```
-
-## Install
-
-```bash
 sudo make install
 ```
 
+
 ## Setup PosgreSQL database
 
-Please, log into your PostgreSQL server console as the superuser. A user without admin privileges cannot create an extension using external libraries.
+Log into the PostgreSQL server as a superuser, as a non-privileged user cannot create an extension using an external library:
 
 ```bash
 psql -U postgres
 ```
+
+And in the psql console, perform the collowing commands:
 
 ```sql
 create role test with login;
@@ -55,62 +57,90 @@ alter schema pgms owner to test;
 \q
 ```
 
-## Import data
+## Import In Silico Spectral Databases of Natural Products (Version 3)
 
-Download the sources.
-
-```bash
-wget -O isdb.mgf https://zenodo.org/record/5607264/files/MultiSources_ISDB_pos.mgf
-```
-
-This particular source of data is malformed so it's necessary to sanitize them locally by:
+Download the sources:
 
 ```bash
-sed -i '/END IONS/,/BEGIN IONS/{/IONS/!d}' isdb.mgf
+wget https://zenodo.org/record/6939173/files/isdb_neg.mgf
+wget https://zenodo.org/record/6939173/files/isdb_pos.mgf
 ```
 
-Please, log into your PostgreSQL server console and import the data into the database. 
+Log into the PostgreSQL server as the database user:
 
 ```bash
 psql -U test -d test
 ```
 
-
-The names of the columns are derived from the paramaters which the input file contains.
+And import the data into the database: 
 
 ```sql
 create table spectrums (
-  scans integer,
-  inchikey varchar,
-  ionmode varchar,
-  charge integer,
-  name varchar,
-  pepmass float,
-  exactmass varchar,
-  libraryquality varchar,
-  molecular_formula varchar,
-  smiles varchar,
-  inchi varchar,
-  spectrum pgms.spectrum
-);
-
-\lo_import isdb.mgf
-
-insert into spectrums select * from pgms.load_from_mgf(:LASTOID) as (
-    "SCANS" integer,
-    "INCHIKEY" varchar,
-    "IONMODE" varchar,
-    "CHARGE" integer,
-    "NAME" varchar,
-    "PEPMASS" float,
-    "EXACTMASS" varchar,
-    "LIBRARYQUALITY" varchar,
-    "MOLECULAR_FORMULA" varchar,
-    "SMILES" varchar,
-    "INCHI" varchar,
-    spectrum pgms.spectrum
+  "SCANS" integer,
+  "IONMODE" varchar,
+  "CHARGE" integer,
+  "NAME" varchar,
+  "PEPMASS" float,
+  "EXACTMASS" varchar,
+  "LIBRARYQUALITY" varchar,
+  "MOLECULAR_FORMULA" varchar,
+  "SMILES" varchar,
+  "INCHI" varchar,
+  spectrum pgms.spectrum,
+  primary key("NAME", "CHARGE")
 );
 ```
+
+```sql
+\lo_import isdb_neg.mgf
+insert into spectrums select * from pgms.load_from_mgf(:LASTOID, null::spectrums);
+
+\lo_import isdb_pos.mgf
+insert into spectrums select * from pgms.load_from_mgf(:LASTOID, null::spectrums);
+```
+
+
+
+
+
+
+```sql
+create table spectrums (
+  "id" varchar,
+  "molfile" varchar,
+  "mass spectral peaks" pgms.spectrum,
+  "collision energy" varchar,
+  "comment" varchar,
+  "contributor" varchar,
+  "exact mass" numeric,
+  "formula" varchar,
+  "inchikey" varchar,
+  "instrument" varchar,
+  "instrument type" varchar,
+  "ion mode" varchar,
+  "mw" integer,
+  "name" varchar,
+  "num peaks" integer,
+  "precursor m/z" varchar,
+  "precursor type" varchar,
+  "spectrum type" varchar,
+  "synonyms" varchar,
+  primary key(id)
+);
+```
+
+```sql
+\lo_import MoNA-export-All_Spectra.sdf
+insert into spectrums select * from pgms.sdf_populate_recordset(null::spectrums, :LASTOID);
+\lo_unlink :LASTOID
+```
+
+
+
+
+
+
+
 
 In case the normalized spectrums are required, use
 

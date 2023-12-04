@@ -5,7 +5,7 @@
  * It is based on cosine similarities from the matchms library
  * available at https://github.com/matchms/matchms.
  *
- * Copyright (c) 2021-2022 Jakub Galgonek
+ * Copyright (c) 2021-2023 Jakub Galgonek
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,11 +21,15 @@
  */
 
 #include <postgres.h>
+#if PG_VERSION_NUM >= 160000
+#include <varatt.h>
+#endif
 #include <fmgr.h>
 #include <math.h>
 #include <float.h>
-#include "cosine.h"
-#include "lsap.h"
+#include <lib/stringinfo.h>
+#include "similarity/cosine.h"
+#include "similarity/lsap.h"
 
 
 #define swap(a,b)   do { typeof(a) t = a; a = b; b = t; } while(0)
@@ -49,16 +53,20 @@ Datum cosine_hungarian(PG_FUNCTION_ARGS)
     const float mz_power = PG_GETARG_FLOAT4(3);
     const float intensity_power = PG_GETARG_FLOAT4(4);
 
+    if((size_t) len1 * (size_t) len2 > 100000000)
+        PG_RETURN_NULL();
 
     int *restrict used1 = palloc(len1 * sizeof(int));
     int *restrict used2 = palloc(len2 * sizeof(int));
-    int *restrict paired1 = palloc(len1 * len2 * sizeof(int));
-    int *restrict paired2 = palloc(len1 * len2 * sizeof(int));
+    StringInfoData buffer1;
+    StringInfoData buffer2;
 
     memset(used1, 0, len1 * sizeof(int));
     memset(used2, 0, len2 * sizeof(int));
+    initStringInfo(&buffer1);
+    initStringInfo(&buffer2);
 
-    int pairs = 0;
+    size_t pairs = 0;
     int lowest_idx = 0;
 
     for(int peak1 = 0; peak1 < len1; peak1++)
@@ -80,12 +88,14 @@ Datum cosine_hungarian(PG_FUNCTION_ARGS)
             used1[peak1]++;
             used2[peak2]++;
 
-            paired1[pairs] = peak1;
-            paired2[pairs] = peak2;
+            appendBinaryStringInfoNT(&buffer1, (char *) &peak1, sizeof(int));
+            appendBinaryStringInfoNT(&buffer2, (char *) &peak2, sizeof(int));
             pairs++;
         }
     }
 
+    int *paired1 = (int *) buffer1.data;
+    int *paired2 = (int *) buffer2.data;
 
     float score = 0;
     int matches = 0;
@@ -98,8 +108,8 @@ Datum cosine_hungarian(PG_FUNCTION_ARGS)
         memset(map1, -1, len1 * sizeof(int));
         memset(map2, -1, len2 * sizeof(int));
 
-        int selected1 = 0;
-        int selected2 = 0;
+        size_t selected1 = 0;
+        size_t selected2 = 0;
 
         for(int i = 0; i < pairs; i++)
         {
@@ -124,7 +134,7 @@ Datum cosine_hungarian(PG_FUNCTION_ARGS)
             swap(len1, len2);
         }
 
-        float *restrict cost = palloc(selected1 * selected2 * sizeof(float));
+        float *restrict cost = palloc_extended(selected1 * selected2 * sizeof(float), MCXT_ALLOC_HUGE);
         memset(cost, 0, selected1 * selected2 * sizeof(float));
 
         float max = 0;

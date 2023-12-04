@@ -3,19 +3,23 @@ pglib_LTLIBRARIES = libpgms.la
 
 
 libpgms_la_SOURCES = \
-		cosine_greedy.c \
-		cosine_hungarian.c \
-		cosine.h \
-		lsap.c \
-		lsap.h \
-		mgf.c \
-		json.c \
+		enum.h \
 		pgms.c \
 		pgms.h \
 		spectrum.c \
-		intersect_mz_match.c \
-		precurzor_mz_match.c \
-		modified_cosine.c
+		spectrum.h \
+		import/input.h \
+		import/mgf.c \
+		import/sdf.c \
+		import/return.h \
+		similarity/cosine_greedy.c \
+		similarity/cosine_hungarian.c \
+		similarity/cosine.h \
+		similarity/intersect_mz_match.c \
+		similarity/lsap.c \
+		similarity/lsap.h \
+		similarity/modified_cosine.c \
+		similarity/precurzor_mz_match.c
 
 
 libpgms_la_LDFLAGS = -lm

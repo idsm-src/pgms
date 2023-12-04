@@ -21,9 +21,12 @@
  */
 
 #include <postgres.h>
+#if PG_VERSION_NUM >= 160000
+#include <varatt.h>
+#endif
 #include <fmgr.h>
 #include <math.h>
-#include "cosine.h"
+#include "similarity/cosine.h"
 
 
 PG_FUNCTION_INFO_V1(cosine_greedy);

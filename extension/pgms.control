@@ -1,5 +1,5 @@
 # pgms extension
 comment = 'mass spectrometry extension'
-default_version = '0.2.0'
+default_version = '0.4'
 module_pathname = '$libdir/libpgms'
 schema = pgms

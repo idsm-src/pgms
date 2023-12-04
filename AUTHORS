@@ -1,8 +1,5 @@
-The author of this extension is Marek Mosna <info@genesissoftware.eu> and Jakub Galgonek <jakub.galgonek@uochb.cas.cz>.
+The authors of this extension are Marek Mosna <info@genesissoftware.eu> and Jakub Galgonek <jakub.galgonek@uochb.cas.cz>.
 
 The extension is based on the Matchms project (https://github.com/matchms/matchms) originally implemented in Python.
 It integrates the shortest augmenting path algorithm from the SciPy project (https://scipy.org) that was implemented by
 Peter M. Larsen.
-
-cvector modul is based on [c-vector](https://github.com/eteran/c-vector.git) implemetation with the contribution 
-of Marek Mosna <info@genesissoftware.eu>

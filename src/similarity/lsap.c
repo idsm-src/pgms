@@ -44,8 +44,7 @@ Author: PM Larsen
 #include <postgres.h>
 #include <math.h>
 #include <stdbool.h>
-#include "utils.h"
-#include "lsap.h"
+#include "similarity/lsap.h"
 
 
 static inline int augmenting_path(int nr, int nc, const float *restrict cost, float offset, const float *restrict u,
@@ -83,7 +82,7 @@ static inline int augmenting_path(int nr, int nc, const float *restrict cost, fl
             int j = remaining[it];
 
             // true cost value is offset - cost[i * nc + j]
-            float r = min + offset - cost[i * nc + j] - u[i] - v[j];
+            float r = min + offset - cost[i * (size_t) nc + j] - u[i] - v[j];
 
             if(r < shortest_paths[j])
             {
@@ -182,7 +181,9 @@ void solve_rectangular_linear_sum_assignment(int nr, int nc, const float *restri
             int i = path[sink];
             row4col[sink] = i;
 
-            swap(col4row[i], sink);
+            int t = col4row[i];
+            col4row[i] = sink;
+            sink = t;
 
             if(i == row)
                 break;
@@ -196,9 +197,9 @@ void solve_rectangular_linear_sum_assignment(int nr, int nc, const float *restri
 
         for(int i = 0; i < nr; i++)
         {
-            if(cost[i * nc + col4row[i]] > 0)
+            if(cost[i * (size_t) nc + col4row[i]] > 0)
             {
-                sum += cost[i * nc + col4row[i]];
+                sum += cost[i * (size_t) nc + col4row[i]];
                 cnt++;
             }
         }

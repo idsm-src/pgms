@@ -19,9 +19,70 @@
  */
 
 #include <postgres.h>
+#if PG_VERSION_NUM >= 160000
+#include <varatt.h>
+#endif
 #include <fmgr.h>
 #include <common/shortest_dec.h>
-#include <errno.h>
+#include <utils/builtins.h>
+#include <utils/float.h>
+#include "spectrum.h"
+
+
+static int spectrum_peak_cmp(const void *l, const void *r)
+{
+    SpectrumPeak *l_value = (SpectrumPeak *) l;
+    SpectrumPeak *r_value = (SpectrumPeak *) r;
+    return l_value->mz == r_value->mz ? 0 : (l_value->mz < r_value->mz ? -1 : 1);
+}
+
+
+Datum create_spectrum(SpectrumPeak *data, int count)
+{
+    qsort(data, count, sizeof(SpectrumPeak), spectrum_peak_cmp);
+
+    size_t size = 2 * count * sizeof(float4) + VARHDRSZ;
+
+    void *result = palloc0(size);
+    float4 *result_data = (float4*) VARDATA(result);
+    SET_VARSIZE(result, size);
+
+    for(size_t i = 0; i < count; i++)
+    {
+        result_data[i] = data[i].mz;
+        result_data[count + i] = data[i].intenzity;
+    }
+
+    PG_RETURN_POINTER(result);
+}
+
+
+static void skip_blank(char **data)
+{
+    while(**data != '\0' && isspace((unsigned char) **data))
+        (*data)++;
+}
+
+
+static float4 read_float(char **data)
+{
+    char *num = *data;
+
+    while(*num != '\0' && isspace((unsigned char) *num))
+        num++;
+
+    if(*num == '\0')
+        ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+    errno = 0;
+
+    float4 val = strtof(num, data);
+
+    if(*data == num || errno != 0)
+        ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+    return val;
+}
 
 
 PG_FUNCTION_INFO_V1(spectrum_input);
@@ -29,35 +90,93 @@ Datum spectrum_input(PG_FUNCTION_ARGS)
 {
     char *data = PG_GETARG_CSTRING(0);
 
-    size_t count = 0;
+    skip_blank(&data);
 
-    for(char *buffer = data; *buffer != '\0'; buffer++)
-        if(*buffer == ':')
-            count++;
-
-    size_t size = count * 2 * sizeof(float4) + VARHDRSZ;
-    void *result = palloc0(size);
-    SET_VARSIZE(result, size);
-
-    float4 *values = (float4 *) VARDATA(result);
-    char *buffer = data;
-
-    for(size_t i = 0; i < count; i++)
+    if(*data == '[' || *data == '{')
     {
-        for(int j = 0; j < 2; j++)
-        {
-            char *end;
-            errno = 0;
-            values[j * count + i] = strtof(buffer, &end);
+        char begin_char = *(data++);
+        char end_char = begin_char == '[' ? ']' : '}';
 
-            if(errno != 0 || *end != (j == 0 ? ':' : i == count - 1 ? '\0' : ','))
+        size_t count = 0;
+
+        for(char *c = data; *c != '\0'; c++)
+            if(*c == begin_char)
+                count++;
+
+        SpectrumPeak *peaks = palloc(count * sizeof(SpectrumPeak));
+
+        for(size_t i = 0; i < count; i++)
+        {
+            if(i > 0)
+            {
+                skip_blank(&data);
+
+                if(*data++ != ',')
+                    ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+            }
+
+            skip_blank(&data);
+
+            if(*data++ != begin_char)
                 ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
 
-            buffer = end + 1;
-        }
-    }
+            peaks[i].mz = read_float(&data);
+            skip_blank(&data);
 
-    PG_RETURN_POINTER(result);
+            if(*data++ != ',')
+                ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+            peaks[i].intenzity = read_float(&data);
+            skip_blank(&data);
+
+            if(*data++ != end_char)
+                ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+        }
+
+        skip_blank(&data);
+
+        if(*data++ != end_char)
+            ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+        if(*data != '\0')
+            ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+        PG_RETURN_DATUM(create_spectrum(peaks, count));
+    }
+    else
+    {
+        size_t count = 0;
+
+        for(char *c = data; *c != '\0'; c++)
+            if(*c == ':')
+                count++;
+
+        SpectrumPeak *peaks = palloc(count * sizeof(SpectrumPeak));
+
+        for(size_t i = 0; i < count; i++)
+        {
+            peaks[i].mz = read_float(&data);
+            skip_blank(&data);
+
+            if(*data++ != ':')
+                ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+            peaks[i].intenzity = read_float(&data);
+
+            if(isspace((unsigned char) *data))
+                skip_blank(&data);
+            else if(i != count - 1 && *data != ',' && *data != ';')
+                ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+            if(i != count - 1 && (*data == ',' || *data == ';'))
+                data++;
+        }
+
+        if(*data != '\0')
+            ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION), errmsg("malformed spectrum literal")));
+
+        PG_RETURN_DATUM(create_spectrum(peaks, count));
+    }
 }
 
 
@@ -77,7 +196,7 @@ Datum spectrum_output(PG_FUNCTION_ARGS)
         buffer += float_to_shortest_decimal_bufn(values[i], buffer);
         *(buffer++) = ':';
         buffer += float_to_shortest_decimal_bufn(values[count + i], buffer);
-        *(buffer++) = ',';
+        *(buffer++) = ' ';
     }
 
     *(count ? buffer - 1 : buffer) = '\0';
@@ -126,4 +245,53 @@ Datum spectrum_normalize(PG_FUNCTION_ARGS)
     }
 
     PG_RETURN_DATUM(result);
+}
+
+
+PG_FUNCTION_INFO_V1(spectrum_is_equal_to);
+Datum spectrum_is_equal_to(PG_FUNCTION_ARGS)
+{
+    PG_RETURN_DATUM(DirectFunctionCall2(byteaeq, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1)));
+}
+
+
+PG_FUNCTION_INFO_V1(spectrum_is_not_equal_to);
+Datum spectrum_is_not_equal_to(PG_FUNCTION_ARGS)
+{
+    PG_RETURN_DATUM(DirectFunctionCall2(byteane, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1)));
+}
+
+
+PG_FUNCTION_INFO_V1(spectrum_is_less_than);
+Datum spectrum_is_less_than(PG_FUNCTION_ARGS)
+{
+    PG_RETURN_DATUM(DirectFunctionCall2(bytealt, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1)));
+}
+
+
+PG_FUNCTION_INFO_V1(spectrum_is_greater_than);
+Datum spectrum_is_greater_than(PG_FUNCTION_ARGS)
+{
+    PG_RETURN_DATUM(DirectFunctionCall2(byteagt, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1)));
+}
+
+
+PG_FUNCTION_INFO_V1(spectrum_is_not_less_than);
+Datum spectrum_is_not_less_than(PG_FUNCTION_ARGS)
+{
+    PG_RETURN_DATUM(DirectFunctionCall2(byteage, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1)));
+}
+
+
+PG_FUNCTION_INFO_V1(spectrum_is_not_greater_than);
+Datum spectrum_is_not_greater_than(PG_FUNCTION_ARGS)
+{
+    PG_RETURN_DATUM(DirectFunctionCall2(byteale, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1)));
+}
+
+
+PG_FUNCTION_INFO_V1(spectrum_compare);
+Datum spectrum_compare(PG_FUNCTION_ARGS)
+{
+    PG_RETURN_DATUM(DirectFunctionCall2(byteacmp, PG_GETARG_DATUM(0), PG_GETARG_DATUM(1)));
 }

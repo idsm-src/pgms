@@ -1,15 +1,19 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.59)
-AC_INIT(pgms, 0.2.0)
+AC_PREREQ([2.71])
+AC_INIT([pgms],[0.4.0])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build])
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
 AC_PROG_CC
+
+AC_CANONICAL_TARGET
 
 AC_CONFIG_MACRO_DIR([m4])
 
 dnl Initialize automake
-AM_INIT_AUTOMAKE([subdir-objects])
+AM_INIT_AUTOMAKE([subdir-objects tar-pax])
 
 dnl this allows us specify individual liking flags for each target
 AM_PROG_CC_C_O 
